@@ -160,7 +160,6 @@ fn http_head_request(instream: TcpStream, hdr: Header)
 
 fn http_post_request(mut instream: TcpStream, headers: Header)
 {
-    
     let bogus_fix = &format!("{}:{}", headers.hostname, 80);
     let mut outstream = TcpStream::connect::<(&str)>(bogus_fix).unwrap();    
 
@@ -266,9 +265,9 @@ fn req_length(buf: [u8;REQUEST_LEN]) -> usize
 struct Header {
     pub hostname: String,
     pub resource: String,    
-        pub content: String,
-        pub length: usize,
-        pub method: String,
+    pub content: String,
+    pub length: usize,
+    pub method: String,
 }
 
 impl Header {

@@ -137,8 +137,7 @@ fn http_connect_request(instream: TcpStream, hdr: Header)
 
 fn http_options_request(mut instream: TcpStream)
 {
-    let allow = "GET,POST,HEAD,CONNECT,OPTIONS";
-
+    let allow = "GET,POST,HEAD,OPTIONS";
     let code: String = "HTTP/1.1 200 OK\r\n".to_string();
     let request: String  = "Allow: ".to_string() + allow + "\r\n\r\n";
 
@@ -388,11 +387,6 @@ fn proxy(stream: TcpStream) {
             "HEAD" =>
             {
                 http_head_request(stream, headers);
-            }
-
-            "CONNECT" => 
-            {
-                http_connect_request(stream, headers);
             }
 
             "OPTIONS" =>

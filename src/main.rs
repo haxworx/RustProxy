@@ -325,23 +325,38 @@ fn request_headers(mut instream: &TcpStream, headers: &mut Header)
     let mut byte = [0u8;1];
     let mut byte_count = 0;
 
-    while ! have_method && byte_count < 16
+	let longest_method = 8;
+	
+    while byte_count != longest_method
     {
         instream.read(&mut byte).unwrap();
+		if byte[0] as char == ' ' && byte_count != 0
+		{
+			break;
+		}
+		
         if byte[0] as char != ' '
         {
             headers.method.push(byte[0] as char);
-        }
-        
-        if byte[0] as char == ' '
-        {
-            have_method = true;
+
+		    match headers.method.as_ref()
+			{
+				"GET" | "POST" | "HEAD" | "OPTIONS" => 
+				{
+					have_method = true;
+				}
+				
+				_ =>
+				{
+					have_method = false;
+				}
+			}			
         }
 
         byte_count += 1;
     }
 
-    if byte_count == 16 || headers.method.is_empty()
+    if ! have_method
     {
         return;
     }

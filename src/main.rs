@@ -126,15 +126,6 @@ fn get_with_no_content_length(mut instream: &TcpStream, mut outstream: &TcpStrea
     }
 }
 
-fn http_connect_request(instream: TcpStream, hdr: Header)
-{
-    let bogus_fix = &format!("{}:{}", hdr.hostname, 80);
-    
-    let outstream = TcpStream::connect::<(&str)>(bogus_fix).unwrap();
-    
-    get_with_no_content_length(&instream, &outstream);    
-}
-
 fn http_options_request(mut instream: TcpStream)
 {
     let allow = "GET,POST,HEAD,OPTIONS";
@@ -146,13 +137,13 @@ fn http_options_request(mut instream: TcpStream)
     instream.write(response.as_bytes()).unwrap();
 }
 
-fn http_head_request(instream: TcpStream, hdr: Header)
+fn http_head_request(hdr: Header)
 {
     let bogus_fix = &format!("{}:{}", hdr.hostname, 80);
 
     let mut outstream = TcpStream::connect::<(&str)>(bogus_fix).unwrap();
 
-    let query: String = format!("xHEAD /{} HTTP/1.1\r\nHost: {}\r\n\r\n", hdr.resource, hdr.hostname);
+    let query: String = format!("HEAD /{} HTTP/1.1\r\nHost: {}\r\n\r\n", hdr.resource, hdr.hostname);
 
     outstream.write(query.as_bytes()).unwrap();
 }
@@ -227,6 +218,8 @@ fn req_resource(buf: [u8;REQUEST_LEN]) -> String
     let bytes = buf;
     let mut request: String = String::new();
     
+	
+	// FIXME WORDPRESS DOESN't WORK!
     while bytes[i] as char != '\0'
     {
         request.push(bytes[i] as char);
@@ -245,8 +238,8 @@ fn req_content(buf: [u8;REQUEST_LEN]) -> String
 
 fn req_hostname(buf: [u8;REQUEST_LEN]) -> String
 {
-    let hostname: String = substr(buf, "http://", '/' as u8);    
-
+    let hostname: String = substr(buf, "http://", '/' as u8);
+	
     return hostname;
 }
 
@@ -321,66 +314,51 @@ fn check_headers(buffer: [u8;REQUEST_LEN], headers: &mut Header) -> bool
 
 fn request_headers(mut instream: &TcpStream, headers: &mut Header) 
 {
-    let mut have_method = false;
     let mut byte = [0u8;1];
-    let mut byte_count = 0;
 
-	let longest_method = 8;
-	
-    while byte_count != longest_method
+	// bit better for now it'll do!
+    while byte[0] as char != ' '
     {
-        instream.read(&mut byte).unwrap();
-		if byte[0] as char == ' ' 
+		instream.read(&mut byte).unwrap();
+		if byte[0] as char != ' '
 		{
-			break; // okay??
+			headers.method.push(byte[0] as char);
 		}
-		
-        if byte[0] as char != ' '
-        {
-            headers.method.push(byte[0] as char);
-
-		    match headers.method.as_ref()
-			{
-				"GET" | "POST" | "HEAD" | "OPTIONS" | "CONNECT" => 
-				{
-					have_method = true;
-				}
-				
-				_ =>
-				{
-					have_method = false;
-				}
-			}			
-        }
-
-        byte_count += 1;
-    }
-
-    if ! have_method
-    {
-        return;
-    }
+	}
+	
+	match headers.method.as_ref()
+	{
+		"GET" | "POST" | "OPTIONS" | "HEAD" =>
+		{
+			// all good do not return!!!
+		}
+			
+		_ =>
+		{
+			return;
+		}
+	}
 
      loop
-     {
-	  let mut buffer = [0u8; REQUEST_LEN];
-          let mut byte = [0u8; 1];
-          let mut len = 0;
+    {
+		let mut buffer = [0u8; REQUEST_LEN];
+        let mut byte = [0u8; 1];
+        let mut len = 0;
             
-          while byte[0] as char != '\n'
-          {
-              let bytes = instream.read(&mut byte).unwrap();
-              buffer[len] = byte[0];
-              len += bytes;
-          }
+        while byte[0] as char != '\n'
+        {
+            let bytes = instream.read(&mut byte).unwrap();
+            buffer[len] = byte[0];
+            len += bytes;
+        }
       
-          buffer[len] = 0; 
+        buffer[len] = 0; 
   
-          if check_headers(buffer, headers) && len == 2
-          {
-              return;
-          }
-     }
+        if check_headers(buffer, headers) && len == 2
+        {
+            return;
+        }
+    }
 }
 
 
@@ -401,7 +379,7 @@ fn proxy(stream: TcpStream) {
 
             "HEAD" =>
             {
-                http_head_request(stream, headers);
+                http_head_request(headers);
             }
 
             "OPTIONS" =>

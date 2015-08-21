@@ -15,8 +15,7 @@
 */
 
 //   This is a HTTP proxy written in Rust!
-//   DONE: POST+GET+OPTIONS+CONNECT
-//   FIXED A STINKER OF A BUG!
+//   DONE: POST+GET+OPTIONS
 
 use std::string::{String};
 use std::net::{SocketAddrV4,Ipv4Addr,TcpListener,TcpStream};
@@ -217,9 +216,8 @@ fn req_resource(buf: [u8;REQUEST_LEN]) -> String
     let mut i = 0;
     let bytes = buf;
     let mut request: String = String::new();
-    
-	
-	// FIXME WORDPRESS DOESN't WORK!
+    	
+    // FIXME WORDPRESS DOESN't WORK!
     while bytes[i] as char != '\0'
     {
         request.push(bytes[i] as char);
@@ -314,11 +312,11 @@ fn check_headers(buffer: [u8;REQUEST_LEN], headers: &mut Header) -> bool
 
 fn request_headers(mut instream: &TcpStream, headers: &mut Header) 
 {
-    let mut byte = [0u8;1];
+	let mut byte = [0u8;1];
 
 	// bit better for now it'll do!
-    while byte[0] as char != ' '
-    {
+	while byte[0] as char != ' '
+	{
 		instream.read(&mut byte).unwrap();
 		if byte[0] as char != ' '
 		{
@@ -341,7 +339,7 @@ fn request_headers(mut instream: &TcpStream, headers: &mut Header)
 
      loop
     {
-		let mut buffer = [0u8; REQUEST_LEN];
+	let mut buffer = [0u8; REQUEST_LEN];
         let mut byte = [0u8; 1];
         let mut len = 0;
             

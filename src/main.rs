@@ -330,9 +330,9 @@ fn request_headers(mut instream: &TcpStream, headers: &mut Header)
     while byte_count != longest_method
     {
         instream.read(&mut byte).unwrap();
-		if byte[0] as char == ' ' && byte_count != 0
+		if byte[0] as char == ' ' 
 		{
-			break;
+			break; // okay??
 		}
 		
         if byte[0] as char != ' '
@@ -341,7 +341,7 @@ fn request_headers(mut instream: &TcpStream, headers: &mut Header)
 
 		    match headers.method.as_ref()
 			{
-				"GET" | "POST" | "HEAD" | "OPTIONS" => 
+				"GET" | "POST" | "HEAD" | "OPTIONS" | "CONNECT" => 
 				{
 					have_method = true;
 				}

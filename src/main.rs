@@ -127,7 +127,7 @@ fn get_with_no_content_length(mut instream: &TcpStream, mut outstream: &TcpStrea
 
 fn http_options_request(mut instream: TcpStream)
 {
-    let allow = "GET,POST,HEAD,OPTIONS";
+    let allow = "GET,POST,HEAD,CONNECT,OPTIONS";
     let code: String = "HTTP/1.1 200 OK\r\n".to_string();
     let request: String  = "Allow: ".to_string() + allow + "\r\n\r\n";
 
@@ -211,6 +211,17 @@ fn http_get_request(instream: TcpStream, headers: Header)
     }
 }
 
+fn http_connect_request(instream: TcpStream, hdr: Header)
+{
+    let bogus_fix = &format!("{}:{}", hdr.hostname, 443);
+	// this needs fixing!!!
+    
+    let outstream = TcpStream::connect::<(&str)>(bogus_fix).unwrap();
+    
+    get_with_no_content_length(&instream, &outstream);    
+}
+
+
 fn req_resource(buf: [u8;REQUEST_LEN]) -> String
 {
     let mut i = 0;
@@ -281,7 +292,6 @@ pub fn new() -> Header
 
 fn check_headers(buffer: [u8;REQUEST_LEN], headers: &mut Header) -> bool
 {
-
     if headers.hostname.is_empty()
     {
         headers.hostname = req_hostname(buffer);
@@ -326,7 +336,7 @@ fn request_headers(mut instream: &TcpStream, headers: &mut Header)
 	
 	match headers.method.as_ref()
 	{
-		"GET" | "POST" | "OPTIONS" | "HEAD" =>
+		"GET" | "POST" | "OPTIONS" | "HEAD" | "CONNECT" =>
 		{
 			// all good do not return!!!
 		}
@@ -339,9 +349,9 @@ fn request_headers(mut instream: &TcpStream, headers: &mut Header)
 
      loop
     {
-	let mut buffer = [0u8; REQUEST_LEN];
+		let mut buffer = [0u8; REQUEST_LEN];
         let mut byte = [0u8; 1];
-        let mut len = 0;
+		let mut len = 0;
             
         while byte[0] as char != '\n'
         {
@@ -350,10 +360,18 @@ fn request_headers(mut instream: &TcpStream, headers: &mut Header)
             len += bytes;
         }
       
-        buffer[len] = 0; 
+        buffer[len] = '\0' as u8; 
   
         if check_headers(buffer, headers) && len == 2
         {
+			let mut i = 0;
+			
+			while i < REQUEST_LEN
+			{
+				buffer[i] = 0;
+				i += 1;
+			}
+			
             return;
         }
     }
@@ -383,13 +401,19 @@ fn proxy(stream: TcpStream) {
             "OPTIONS" =>
             {
                 http_options_request(stream);
-            }        
+            }  
+
+			"CONNECT" =>
+			{
+				println!("here {} and {}", headers.hostname, headers.resource);
+				http_connect_request(stream, headers);
+			}
 
             _ =>
             {
                 println!("REQUEST UNKNOWN");
             }
-        }        
+        }     
 }
 
 extern crate threadpool;

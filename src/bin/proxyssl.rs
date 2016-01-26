@@ -64,20 +64,17 @@ fn substr(buf: [u8;REQUEST_LEN], needle: &str, byte: u8) -> String
 
 const CHUNK: usize = 4096; // PAGESIZEish
 
-fn talk_to_me(mut instream: &TcpStream, mut outstream: &TcpStream, mut headers: &Header) -> usize
+fn talk_to_me(mut instream: &TcpStream, mut outstream: &TcpStream, mut headers: &Header) -> bool
 {
 
 	let mut buf = [0u8; CHUNK];
 		
 	println!("top");
-
 	let bytes = instream.read(&mut buf).unwrap();
 	if bytes <= 0 {
-		return 0;
+		return false;
 	}
 
-	let mut i = 0;
-		
 	println!("recv {}", bytes);
 
 	for i in 0..bytes {
@@ -89,13 +86,12 @@ fn talk_to_me(mut instream: &TcpStream, mut outstream: &TcpStream, mut headers: 
 	while chunk < bytes {
 		let sent = outstream.write(&mut buf[0..bytes]).unwrap();
 		if sent <= 0 {
-			return 0;
+			return false;
 		}
 		println!("sent {}", sent);
 		chunk = chunk + sent;
 	}
-
-	bytes
+	true
 }
 
 struct Header {
@@ -132,8 +128,7 @@ fn http_connect_request(instream: TcpStream, headers: Header)
 	let bogus_fix = &format!("{}", headers.hostname);
 		
 	let outstream = TcpStream::connect::<(&str)>(bogus_fix).unwrap();
-
-	let mut tx = 1;
+	let mut disconnected = false;
 	
 	let request = format!("HTTP/1.1 200 Connection established\r\nUser-Agent: {}\r\nProxy-Connection: {}\r\nConnection: {}\r\nHost: {}\r\n\r\n",
 			headers.agent, headers.proxy, headers.connection, headers.hostname);
@@ -141,10 +136,9 @@ fn http_connect_request(instream: TcpStream, headers: Header)
 	let mut s = &instream;	
 	s.write(request.as_bytes()).unwrap(); // tell client the connection is made
 
-	while tx != 0 {	
-		tx = talk_to_me(&instream, &outstream, &headers);	
+	while ! disconnected {	
+		disconnected = talk_to_me(&instream, &outstream, &headers);	
 	}	
-	println!("tx is {}", tx);
 }
 
 fn check_headers(buffer: [u8;REQUEST_LEN], headers: &mut Header) -> bool
@@ -287,7 +281,7 @@ fn proxy_time(port: u16, threads: usize) {
 
 	let pool = ThreadPool::new(threads);
 
-	for mut stream in listener.incoming()
+	for stream in listener.incoming()
 	{
 		match stream
 		{

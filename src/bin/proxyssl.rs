@@ -66,6 +66,7 @@ fn substr(buf: [u8;REQUEST_LEN], needle: &str, byte: u8) -> String
 
 const CHUNK: usize = 4096; // PAGESIZEish
 
+// use mio in here???
 fn talk_to_me(mut instream: &TcpStream, mut outstream: &TcpStream) -> bool
 {
 

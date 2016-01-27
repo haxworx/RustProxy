@@ -68,9 +68,9 @@ fn talk_to_me(mut instream: &TcpStream, mut outstream: &TcpStream, mut headers: 
 {
 
 	let mut buf = [0u8; CHUNK];
-		
+	
 	println!("top");
-	let bytes = instream.read(&mut buf).unwrap();
+	let bytes = outstream.read(&mut buf).unwrap();
 	if bytes <= 0 {
 		return false;
 	}
@@ -84,7 +84,7 @@ fn talk_to_me(mut instream: &TcpStream, mut outstream: &TcpStream, mut headers: 
 	let mut chunk = 0;
    
 	while chunk < bytes {
-		let sent = outstream.write(&mut buf[0..bytes]).unwrap();
+		let sent = instream.write(&mut buf[0..bytes]).unwrap();
 		if sent <= 0 {
 			return false;
 		}
@@ -130,19 +130,16 @@ fn http_connect_request(instream: TcpStream, headers: Header)
 	let mut outstream = TcpStream::connect::<(&str)>(bogus_fix).unwrap();
 	let mut disconnected = false;
 	
-	let request = format!("HTTP/1.1 200 Connection established\r\nUser-Agent: {}\r\nProxy-Connection: {}\r\nConnection: {}\r\nHost: {}\r\n\r\n",
+	let response = format!("HTTP/1.1 200 Connection established\r\nUser-Agent: {}\r\nProxy-Connection: {}\r\nConnection: {}\r\nHost: {}\r\n\r\n",
 			headers.agent, headers.proxy, headers.connection, headers.hostname);
-	println!("sending: \n\n{}", request);
+	println!("sending: \n\n{}", response);
 	let mut s = &instream;	
-	s.write(request.as_bytes()).unwrap(); // tell client the connection is made
-
+	s.write(response.as_bytes()).unwrap(); // tell client the connection is made
 
 	while ! disconnected {	
 		disconnected = talk_to_me(&instream, &outstream, &headers);	
 	}	
 	
-	let response = format!("HTTP/1.1 200 OK\r\n\r\n");
-	outstream.write(response.as_bytes()).unwrap();
 
 }
 

@@ -15,6 +15,8 @@
 */
 
 //   This is a HTTPS CONNECT proxy!
+//   it doesn't work yet as i don't know how to do this in Rust, is it 
+//   even possible yet???
 
 use std::string::{String};
 use std::net::{SocketAddrV4,Ipv4Addr,TcpListener,TcpStream};
@@ -64,7 +66,7 @@ fn substr(buf: [u8;REQUEST_LEN], needle: &str, byte: u8) -> String
 
 const CHUNK: usize = 4096; // PAGESIZEish
 
-fn talk_to_me(mut instream: &TcpStream, mut outstream: &TcpStream, mut headers: &Header) -> bool
+fn talk_to_me(mut instream: &TcpStream, mut outstream: &TcpStream) -> bool
 {
 
 	let mut buf = [0u8; CHUNK];
@@ -127,7 +129,7 @@ fn http_connect_request(instream: TcpStream, headers: Header)
 {
 	let bogus_fix = &format!("{}", headers.hostname);
 		
-	let mut outstream = TcpStream::connect::<(&str)>(bogus_fix).unwrap();
+	let outstream = TcpStream::connect::<(&str)>(bogus_fix).unwrap();
 	let mut disconnected = false;
 	
 	let response = format!("HTTP/1.1 200 Connection established\r\nUser-Agent: {}\r\nProxy-Connection: {}\r\nConnection: {}\r\nHost: {}\r\n\r\n",
@@ -136,11 +138,12 @@ fn http_connect_request(instream: TcpStream, headers: Header)
 	let mut s = &instream;	
 	s.write(response.as_bytes()).unwrap(); // tell client the connection is made
 
+	// need to work out the best way to do this???
+	// there is mio crate...
+	// can we even do this in Rust yet???
 	while ! disconnected {	
-		disconnected = talk_to_me(&instream, &outstream, &headers);	
+		disconnected = talk_to_me(&instream, &outstream);	
 	}	
-	
-
 }
 
 fn check_headers(buffer: [u8;REQUEST_LEN], headers: &mut Header) -> bool

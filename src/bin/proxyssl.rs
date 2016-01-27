@@ -127,18 +127,23 @@ fn http_connect_request(instream: TcpStream, headers: Header)
 {
 	let bogus_fix = &format!("{}", headers.hostname);
 		
-	let outstream = TcpStream::connect::<(&str)>(bogus_fix).unwrap();
+	let mut outstream = TcpStream::connect::<(&str)>(bogus_fix).unwrap();
 	let mut disconnected = false;
 	
 	let request = format!("HTTP/1.1 200 Connection established\r\nUser-Agent: {}\r\nProxy-Connection: {}\r\nConnection: {}\r\nHost: {}\r\n\r\n",
 			headers.agent, headers.proxy, headers.connection, headers.hostname);
-
+	println!("sending: \n\n{}", request);
 	let mut s = &instream;	
 	s.write(request.as_bytes()).unwrap(); // tell client the connection is made
+
 
 	while ! disconnected {	
 		disconnected = talk_to_me(&instream, &outstream, &headers);	
 	}	
+	
+	let response = format!("HTTP/1.1 200 OK\r\n\r\n");
+	outstream.write(response.as_bytes()).unwrap();
+
 }
 
 fn check_headers(buffer: [u8;REQUEST_LEN], headers: &mut Header) -> bool

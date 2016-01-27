@@ -18,10 +18,9 @@
 //   it doesn't work yet as i don't know how to do this in Rust, is it 
 //   even possible yet???
 
-use std::string::{String};
-use std::net::{SocketAddrV4,Ipv4Addr,TcpListener,TcpStream};
 use std::io::{Write, Read};
-
+use std::string::{String};
+use std::net::{SocketAddrV4, TcpListener, TcpStream};
 const REQUEST_LEN: usize = 65535;
 
 fn substr(buf: [u8;REQUEST_LEN], needle: &str, byte: u8) -> String
@@ -67,8 +66,21 @@ fn substr(buf: [u8;REQUEST_LEN], needle: &str, byte: u8) -> String
 const CHUNK: usize = 4096; // PAGESIZEish
 
 // use mio in here???
+extern crate mio;
+use mio::*;
+
 fn talk_to_me(mut instream: &TcpStream, mut outstream: &TcpStream) -> bool
 {
+	//let mut event_loop = EventLoop::new().unwrap();
+
+	const SERVER: Token = Token(0);
+	const CLIENT: Token = Token(1);
+
+	//event_loop.register(&instream, CLIENT, EventSet::readable(),
+	//		PollOpt::edge()).unwrap();
+
+	//event_loop.register(&outstream, SERVER, EventSet::readable(),
+	//	PollOpt::edge()).unwrap();
 
 	let mut buf = [0u8; CHUNK];
 	
@@ -128,9 +140,8 @@ pub fn new() -> Header
 
 fn http_connect_request(instream: TcpStream, headers: Header)
 {
-	let bogus_fix = &format!("{}", headers.hostname);
-		
-	let outstream = TcpStream::connect::<(&str)>(bogus_fix).unwrap();
+	let addr = &format!("{}:{}", headers.hostname, 443);	
+	let outstream = TcpStream::connect::<(&str)>(addr).unwrap();
 	let mut disconnected = false;
 	
 	let response = format!("HTTP/1.1 200 Connection established\r\nUser-Agent: {}\r\nProxy-Connection: {}\r\nConnection: {}\r\nHost: {}\r\n\r\n",

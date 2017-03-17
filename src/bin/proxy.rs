@@ -419,7 +419,7 @@ fn main () {
 	let threads = 128;
 	let port: u16 = 9999;
 		
-	proxy_time(port, threads);
 	println!("Blocking all badness");
+	proxy_time(port, threads);
 }
 

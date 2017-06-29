@@ -1,17 +1,6 @@
 /*
-  Copyright (c) 2015, Al Poole <netstar@gmail.com>
+    This is bogus but it's something to msss about with
 
-  Permission to use, copy, modify, and/or distribute this software for any 
-  purpose with or without fee is hereby granted, provided that the above 
-  copyright notice and this permission notice appear in all copies.
-
-  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-  REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY 
-  AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, 
-  INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM 
-  LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
-  OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR 
-  PERFORMANCE OF THIS SOFTWARE.
 */
 
 //   This is a HTTP proxy written in Rust!
@@ -65,11 +54,28 @@ fn substr(buf: [u8;REQUEST_LEN], needle: &str, byte: u8) -> String
 
 const CHUNK: usize = 4096; // PAGESIZEish
 
-fn get_with_content_length(mut instream: &TcpStream, mut outstream: &TcpStream, total: usize) {
+struct Request {
+   pub headers: Header,
+}
+
+impl Request {
+
+pub fn new() -> Request
+{
+        let headers = Header::new();
+
+        let r = Request {
+	   headers: headers,
+        };
+
+        r
+}
+
+fn get_with_content_length(self: &mut Request, mut instream: &TcpStream, mut outstream: &TcpStream) {
 	let mut current = 0;
 	let mut buf = [0u8; CHUNK];
 
-	while current < total {
+	while current < self.headers.content_length {
 		let bytes = outstream.read(&mut buf). unwrap();
 		if bytes == 0 {
 			break;	
@@ -88,7 +94,7 @@ fn get_with_content_length(mut instream: &TcpStream, mut outstream: &TcpStream, 
 	}	
 }
 
-fn get_with_no_content_length(mut instream: &TcpStream, mut outstream: &TcpStream)
+fn get_with_no_content_length(self: &mut Request, mut instream: &TcpStream, mut outstream: &TcpStream)
 {
 	loop {
 		let mut buf = [0u8; CHUNK];
@@ -110,7 +116,7 @@ fn get_with_no_content_length(mut instream: &TcpStream, mut outstream: &TcpStrea
 	}
 }
 
-fn http_options_request(mut instream: TcpStream)
+pub fn options(self: &mut Request, mut instream: TcpStream)
 {
 	let allow = "GET,POST,HEAD,CONNECT,OPTIONS";
 	let code: String = "HTTP/1.1 200 OK\r\n".to_string();
@@ -121,23 +127,23 @@ fn http_options_request(mut instream: TcpStream)
 	instream.write(response.as_bytes()).unwrap();
 }
 
-fn http_head_request(hdr: Header)
+pub fn head(self: &mut Request)
 {
-	let bogus_fix = &format!("{}:{}", hdr.hostname, 80);
+	let bogus_fix = &format!("{}:{}", self.headers.hostname, 80);
 
 	let mut outstream = TcpStream::connect::<(&str)>(bogus_fix).unwrap();
 
-	let query: String = format!("HEAD /{} HTTP/1.1\r\nHost: {}\r\n\r\n", hdr.resource, hdr.hostname);
+	let query: String = format!("HEAD /{} HTTP/1.1\r\nHost: {}\r\n\r\n", self.headers.resource, self.headers.hostname);
 
 	outstream.write(query.as_bytes()).unwrap();
 }
 
-fn http_post_request(mut instream: TcpStream, headers: Header)
+pub fn post(self: &mut Request, mut instream: TcpStream)
 {
-	let bogus_fix = &format!("{}:{}", headers.hostname, 80);
+	let bogus_fix = &format!("{}:{}", self.headers.hostname, 80);
 	let mut outstream = TcpStream::connect::<(&str)>(bogus_fix).unwrap();	
 
-	let query: String = format!("POST {}Host: {}\r\nContent-Type: {}\r\nContent-Length: {}\r\n\r\n", headers.resource, headers.hostname, headers.content, headers.length);
+	let query: String = format!("POST {}Host: {}\r\nContent-Type: {}\r\nContent-Length: {}\r\n\r\n", self.headers.resource, self.headers.hostname, self.headers.content_type, self.headers.content_length);
 	outstream.write(query.as_bytes()).unwrap();
 
 	println!("QUERY: {}", query);
@@ -145,7 +151,7 @@ fn http_post_request(mut instream: TcpStream, headers: Header)
 	let mut buf = [0u8; CHUNK];
 	let mut current = 0;
 
-	while current < headers.length {
+	while current < self.headers.content_length {
 		let bytes = instream.read(&mut buf).unwrap();
 		if bytes == 0 {
 			break;
@@ -168,82 +174,44 @@ fn http_post_request(mut instream: TcpStream, headers: Header)
 
 	outstream.write(terminate.as_bytes()).unwrap();
 
-	get_with_no_content_length(&instream, &outstream);
+	self.get_with_no_content_length(&instream, &outstream);
 }
 
-fn http_get_request(instream: TcpStream, headers: Header) 
+pub fn get(self: &mut Request, instream: TcpStream)
 {
-	let bogus_fix = &format!("{}:{}", headers.hostname, 80);
+
+	let bogus_fix = &format!("{}:{}", self.headers.hostname, 80);
 
 	let mut outstream = TcpStream::connect::<(&str)>(bogus_fix).unwrap();
 
-	let query: String = format!("GET {}Host: {}\r\nConnection: close\r\n\r\n", headers.resource, headers.hostname);
+	let query: String = format!("GET {}Host: {}\r\nConnection: close\r\n\r\n", self.headers.resource, self.headers.hostname);
 	outstream.write(query.as_bytes()).unwrap();
 
 	println!("QUERY: {}", query);
 
-	if headers.length > 0 {
-		get_with_content_length(&instream, &outstream, headers.length);
+	if self.headers.content_length > 0 {
+		self.get_with_content_length(&instream, &outstream);
 	} else { 
-		get_with_no_content_length(&instream, &outstream);
+		self.get_with_no_content_length(&instream, &outstream);
 	}
 }
 
-fn http_connect_request(instream: TcpStream, hdr: Header)
+pub fn connect(self: &mut Request, instream: TcpStream)
 {
-	let bogus_fix = &format!("{}:{}", hdr.hostname, 443);
+	let bogus_fix = &format!("{}:{}", self.headers.hostname, 443);
 	// this needs fixing!!!
 	
 	let outstream = TcpStream::connect::<(&str)>(bogus_fix).unwrap();
 	
-	get_with_no_content_length(&instream, &outstream);	
+	self.get_with_no_content_length(&instream, &outstream);	
 }
-
-
-fn req_resource(buf: [u8;REQUEST_LEN]) -> String
-{
-	let mut i = 0;
-	let bytes = buf;
-	let mut request: String = String::new();
-		
-	// FIXME WORDPRESS DOESN't WORK!
-	while bytes[i] as char != '\0' {
-		request.push(bytes[i] as char);
-		i += 1;
-	}
-		
-	return request;
-}
-
-fn req_content(buf: [u8;REQUEST_LEN]) -> String
-{
-	let content = substr(buf, "Content-Type: ", '\r' as u8);
-
-	return content;
-}
-
-fn req_hostname(buf: [u8;REQUEST_LEN]) -> String
-{
-	let hostname: String = substr(buf, "http://", '/' as u8);
-	
-	return hostname;
-}
-
-fn req_length(buf: [u8;REQUEST_LEN]) -> usize
-{
-	let request: String = substr(buf, "Content-Length: ", '\r' as u8);
-	if ! request.is_empty() {
-		return request.trim().parse().unwrap();
-	}
-
-	return 0;
 }
 
 struct Header {
 	pub hostname: String,
 	pub resource: String,	
-	pub content: String,
-	pub length: usize,
+	pub content_type: String,
+	pub content_length: usize,
 	pub method: String,
 }
 
@@ -253,50 +221,47 @@ pub fn new() -> Header
 {
 	let hostname = String::new();
 	let resource = String::new();
-	let content  = String::new();
-	let method   = String::new();
-	let length   = 0;
+	let content_type  = String::new();
+	let content_length = 0;
+	let method = String::new();
 
 	let h = Header {
 		hostname: hostname, 
 		resource: resource , 
-		content: content, 
-		length: length, 
+		content_type: content_type, 
+		content_length: content_length, 
 		method: method
 	};
 
 	return h;
 }
 
-}
-
-
-fn check_headers(buffer: [u8;REQUEST_LEN], headers: &mut Header) -> bool
+fn check(self: &mut Header, buffer: [u8;REQUEST_LEN]) -> bool
 {
-	if headers.hostname.is_empty() {
-		headers.hostname = req_hostname(buffer);
+	if self.hostname.is_empty() {
+	   self.hostname = self.hostname(buffer);
 	}
 	
-	if headers.resource.is_empty() {
-		headers.resource = req_resource(buffer);
+	if self.resource.is_empty() {
+		self.resource = self.resource(buffer);
 	}
 
-	if headers.content.is_empty() {
-		headers.content = req_content(buffer);
+	if self.content_type.is_empty() {
+		self.content_type = self.content_type(buffer);
 	}
 
-	if headers.length == 0 {
-		headers.length = req_length(buffer);
+	if self.content_length == 0 {
+		self.content_length = self.content_length(buffer);
 	}
 
-	if headers.hostname.is_empty() || headers.resource.is_empty() || headers.method.is_empty() {
+	if self.hostname.is_empty() || self.resource.is_empty() || self.method.is_empty() {
 		return false;
 	}
 	
 	return true;
 }
 
-fn request_headers(mut instream: &TcpStream, headers: &mut Header) 
+fn get(self: &mut Header, mut instream: &TcpStream)
 {
 	let mut byte = [0u8;1];
 
@@ -305,11 +270,11 @@ fn request_headers(mut instream: &TcpStream, headers: &mut Header)
 		instream.read(&mut byte).unwrap();
 		if byte[0] as char != ' '
 		{
-			headers.method.push(byte[0] as char);
+			self.method.push(byte[0] as char);
 		}
 	}
 	
-	match headers.method.as_ref() {
+	match self.method.as_ref() {
 		"GET" | "POST" | "OPTIONS" | "HEAD" | "CONNECT" =>
 		{
 			// all good do not return!!!
@@ -334,7 +299,7 @@ fn request_headers(mut instream: &TcpStream, headers: &mut Header)
 	  
 		buffer[len] = '\0' as u8; 
   
-		if check_headers(buffer, headers) && len == 2 {
+		if self.check(buffer) && len == 2 {
 			let mut i = 0;
 			
 			while i < REQUEST_LEN {
@@ -346,36 +311,75 @@ fn request_headers(mut instream: &TcpStream, headers: &mut Header)
 	}
 }
 
+fn resource(self: &mut Header, buf: [u8;REQUEST_LEN]) -> String
+{
+	let mut i = 0;
+	let bytes = buf;
+	let mut request: String = String::new();
+		
+	// FIXME WORDPRESS DOESN't WORK!
+	while bytes[i] as char != '\0' {
+		request.push(bytes[i] as char);
+		i += 1;
+	}
+		
+	return request;
+}
+
+fn content_type(self: &mut Header, buf: [u8;REQUEST_LEN]) -> String
+{
+	let content = substr(buf, "Content-Type: ", '\r' as u8);
+
+	return content;
+}
+
+fn hostname(self: &mut Header, buf: [u8;REQUEST_LEN]) -> String
+{
+	let hostname: String = substr(buf, "http://", '/' as u8);
+	
+	return hostname;
+}
+
+fn content_length(self: &mut Header, buf: [u8;REQUEST_LEN]) -> usize
+{
+	let request: String = substr(buf, "Content-Length: ", '\r' as u8);
+	if ! request.is_empty() {
+		return request.trim().parse().unwrap();
+	}
+
+	return 0;
+}
+
+}
 
 fn proxy(stream: TcpStream) {
-	let mut headers: Header = Header::new();
-	request_headers(&stream, &mut headers);
+        let mut http: Request = Request::new();
+	http.headers.get(&stream);
 
-	match headers.method.as_ref() {
+	match http.headers.method.as_ref() {
 		"GET" => 
 		{
-			http_get_request(stream, headers);
+			http.get(stream);
 		}
 
 		"POST" =>
 		{
-			http_post_request(stream, headers);
+			http.post(stream);
 		}
 
 		"HEAD" =>
 		{
-			http_head_request(headers);
+			http.head();
 		}
 
 		"OPTIONS" =>
 		{
-			http_options_request(stream);
+			http.options(stream);
 		}  
 
 		"CONNECT" =>
 		{
-			println!("here {} and {}", headers.hostname, headers.resource);
-			http_connect_request(stream, headers);
+			http.connect(stream);
 		}
 
 		_ =>
@@ -419,7 +423,7 @@ fn main () {
 	let threads = 128;
 	let port: u16 = 9999;
 		
-	println!("Blocking all badness");
+	println!("Blocking all badness on port {}", port);
 	proxy_time(port, threads);
 }
 

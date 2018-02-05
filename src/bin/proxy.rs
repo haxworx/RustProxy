@@ -1,6 +1,5 @@
 /*
     This is bogus but it's something to msss about with
-
 */
 
 //   This is a HTTP proxy written in Rust!
@@ -11,46 +10,6 @@ use std::net::{SocketAddrV4,Ipv4Addr,TcpListener,TcpStream};
 use std::io::{Write, Read};
 
 const REQUEST_LEN: usize = 65535;
-
-fn substr(buf: [u8;REQUEST_LEN], needle: &str, byte: u8) -> String
-{
-	let mut i = 0;
-	let mut x = 0;
-	let mut request = String::new();
-
-	let srch = needle.as_bytes();
-
-	if srch.len() == 0 {
-		return request;
-	}	
-	
-	while buf[i] as char != '\0' {
-		if buf[i] as char == srch[0] as char {
-			while x < srch.len() && buf[i] as char  == srch[x] as char {
-				i = i + 1;
-				x = x + 1;
-			}
-			break;
-		} else {
-			i = i + 1;
-		}
-	}
-
-	if x == srch.len() 
-	{	
-		//println!("match");
-		let mut end = i;
-		while buf[end] as char != byte as char && buf[end] as char != '\n' {
-			end = end + 1;
-		}
-
-		for y in i..end { 
-			request.push(buf[y] as char);
-		}
-	}	
-
-	return request;
-} 
 
 const CHUNK: usize = 4096; // PAGESIZEish
 
@@ -200,6 +159,8 @@ pub fn connect(self: &mut Request, instream: TcpStream)
 {
 	let bogus_fix = &format!("{}:{}", self.headers.hostname, 443);
 	// this needs fixing!!!
+
+        println!("here {}", self.headers.hostname);
 	
 	let outstream = TcpStream::connect::<(&str)>(bogus_fix).unwrap();
 	
@@ -236,31 +197,6 @@ pub fn new() -> Header
 	return h;
 }
 
-fn check(self: &mut Header, buffer: [u8;REQUEST_LEN]) -> bool
-{
-	if self.hostname.is_empty() {
-	   self.hostname = self.hostname(buffer);
-	}
-	
-	if self.resource.is_empty() {
-		self.resource = self.resource(buffer);
-	}
-
-	if self.content_type.is_empty() {
-		self.content_type = self.content_type(buffer);
-	}
-
-	if self.content_length == 0 {
-		self.content_length = self.content_length(buffer);
-	}
-
-	if self.hostname.is_empty() || self.resource.is_empty() || self.method.is_empty() {
-		return false;
-	}
-	
-	return true;
-}
-
 fn get(self: &mut Header, mut instream: &TcpStream)
 {
 	let mut byte = [0u8;1];
@@ -285,8 +221,8 @@ fn get(self: &mut Header, mut instream: &TcpStream)
 			return;
 		}
 	}
-
-	loop {
+	
+       loop {
 		let mut buffer = [0u8; REQUEST_LEN];
 		let mut byte = [0u8; 1];
 		let mut len = 0;
@@ -298,56 +234,12 @@ fn get(self: &mut Header, mut instream: &TcpStream)
 		}
 	  
 		buffer[len] = '\0' as u8; 
-  
-		if self.check(buffer) && len == 2 {
-			let mut i = 0;
-			
-			while i < REQUEST_LEN {
-				buffer[i] = 0;
-				i += 1;
-			}
-			return;
-		}
+
+                if len == 2 && buffer[0] as char == '\r' && buffer[1] as char == '\n' {
+                        return;
+                }
+ 
 	}
-}
-
-fn resource(self: &mut Header, buf: [u8;REQUEST_LEN]) -> String
-{
-	let mut i = 0;
-	let bytes = buf;
-	let mut request: String = String::new();
-		
-	// FIXME WORDPRESS DOESN't WORK!
-	while bytes[i] as char != '\0' {
-		request.push(bytes[i] as char);
-		i += 1;
-	}
-		
-	return request;
-}
-
-fn content_type(self: &mut Header, buf: [u8;REQUEST_LEN]) -> String
-{
-	let content = substr(buf, "Content-Type: ", '\r' as u8);
-
-	return content;
-}
-
-fn hostname(self: &mut Header, buf: [u8;REQUEST_LEN]) -> String
-{
-	let hostname: String = substr(buf, "http://", '/' as u8);
-	
-	return hostname;
-}
-
-fn content_length(self: &mut Header, buf: [u8;REQUEST_LEN]) -> usize
-{
-	let request: String = substr(buf, "Content-Length: ", '\r' as u8);
-	if ! request.is_empty() {
-		return request.trim().parse().unwrap();
-	}
-
-	return 0;
 }
 
 }
